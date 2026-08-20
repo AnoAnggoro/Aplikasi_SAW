@@ -6,13 +6,14 @@
 <meta name="theme-color" content="#2d89ef">
 <meta name="description" content="Aplikasi analisis produk fast moving dan slow moving menggunakan metode SAW">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="APLIKASI SAW - Fast/Slow Moving">
-<link rel="apple-touch-icon" href="logo.png">
+<link rel="apple-touch-icon" href="img/logo.png">
 <title>APLIKASI SAW - Fast/Slow Moving</title>
-<link rel="manifest" href="manifest.json">
+<link rel="manifest" href="manifest.json" crossorigin="use-credentials">
 <link rel="stylesheet" href="styles.css">
-<link rel="icon" href="logo.png" type="image/png">
+<link rel="icon" href="img/logo.png" type="image/png">
 </head>
 <body>
 <div id="app">
@@ -188,42 +189,165 @@
         <p style="color:var(--muted);margin-bottom:12px">Unduh atau cetak laporan</p>
         
         <div style="display:flex;gap:8px;margin-bottom:8px">
-          <a href="api.php?action=report_products" target="_blank" class="btn" style="flex:1">📦 Download CSV Produk</a>
+          <a href="javascript:void(0)" onclick="downloadCSV('report_products', 'laporan_produk.csv')" class="btn" style="flex:1">📦 Download CSV Produk</a>
           <a href="print.php?type=products" target="_blank" class="btn secondary" style="flex:1">🖨️ Cetak Produk</a>
         </div>
         
         <div style="display:flex;gap:8px;margin-bottom:8px">
-          <a href="api.php?action=report_sales" target="_blank" class="btn" style="flex:1">💰 Download CSV Penjualan</a>
+          <a href="javascript:void(0)" onclick="downloadCSV('report_sales', 'laporan_penjualan.csv')" class="btn" style="flex:1">💰 Download CSV Penjualan</a>
           <a href="print.php?type=sales" target="_blank" class="btn secondary" style="flex:1">🖨️ Cetak Penjualan</a>
         </div>
         
-        <div style="display:flex;gap:8px">
-          <a href="api.php?action=report_analysis" target="_blank" class="btn" style="flex:1">📊 Download CSV Analisis</a>
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <a href="javascript:void(0)" onclick="downloadCSV('report_analysis', 'laporan_analisis.csv')" class="btn" style="flex:1">📊 Download CSV Analisis</a>
           <a href="print.php?type=analysis" target="_blank" class="btn secondary" style="flex:1">🖨️ Cetak Analisis</a>
+        </div>
+        
+        <div style="display:flex;gap:8px">
+          <a href="javascript:void(0)" onclick="downloadCSV('report_profit', 'laporan_keuntungan.csv')" class="btn" style="flex:1">💸 Download CSV Keuntungan</a>
+          <a href="print.php?type=profit" target="_blank" class="btn secondary" style="flex:1">🖨️ Cetak Keuntungan</a>
         </div>
       </div>
     </section>
   </div>
 </div>
 
+
 <script>
-const api = (action, data)=> {
+const api = async (action, data)=> {
   let fd = new FormData();
   fd.append('action', action);
   if (data) for (let k in data) fd.append(k, data[k]);
-  return fetch('api.php', {method:'POST', body:fd}).then(r=>r.json());
+  
+  try {
+    const r = await fetch('api.php', {method:'POST', body:fd});
+    if (!r.ok) {
+      try {
+        const errJson = await r.json();
+        if (errJson && errJson.error) {
+          throw new Error(errJson.error);
+        }
+      } catch (e) {}
+      throw new Error(`HTTP error! status: ${r.status}`);
+    }
+    const contentType = r.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      return await r.json();
+    } else {
+      const textResponse = await r.text();
+      if (textResponse.includes('aes.js') || textResponse.includes('__test')) {
+        throw new Error('Permintaan diblokir oleh sistem keamanan hosting (InfinityFree). Silakan refresh halaman browser Anda.');
+      }
+      throw new Error('Server mengembalikan respon non-JSON. Kemungkinan terjadi error PHP.');
+    }
+  } catch (err) {
+    console.error('API call failed:', err);
+    throw err;
+  }
 };
+
+async function downloadCSV(action, filename) {
+  try {
+    const apiUrl = `api.php?action=${action}`;
+    const fullUrl = new URL(apiUrl, window.location.href).href;
+    const isMedian = (typeof window.median !== 'undefined' || typeof window.gonative !== 'undefined');
+    const ua = navigator.userAgent || navigator.vendor || window.opera;
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+    
+    if (isMedian) {
+      // Median.co APK: try native bridge first, then iframe fallback
+      try {
+        const bridge = window.median || window.gonative;
+        // Call directly without typeof check — Median bridge methods are proxy objects
+        bridge.share.downloadFile({ url: fullUrl, open: true });
+        return; // success
+      } catch (e) {
+        console.warn('Median bridge failed, using iframe fallback:', e);
+      }
+      
+      // Fallback: hidden iframe — triggers WebView DownloadManager via Content-Disposition
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.src = fullUrl;
+      document.body.appendChild(iframe);
+      setTimeout(() => { try { document.body.removeChild(iframe); } catch(e){} }, 10000);
+      return;
+    }
+    
+    if (isMobile) {
+      // Mobile browser: direct link with download attribute
+      const a = document.createElement('a');
+      a.href = fullUrl;
+      a.setAttribute('download', filename);
+      a.setAttribute('target', '_blank');
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => document.body.removeChild(a), 500);
+      return;
+    }
+    
+    // Desktop: Fetch and download as Blob
+    const response = await fetch(apiUrl);
+    if (!response.ok) throw new Error('Gagal mengambil data laporan dari server');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    }, 200);
+  } catch (error) {
+    console.error('Download CSV error:', error);
+    // Ultimate fallback: direct navigation
+    window.location.href = `api.php?action=${action}`;
+  }
+}
+
+async function refreshReportFiles() {
+  try {
+    await api('generate_reports');
+  } catch (e) {}
+}
 
 document.getElementById('loginForm').addEventListener('submit', async e=>{
   e.preventDefault();
   const f = new FormData(e.target);
-  const res = await api('login',{username:f.get('username'),password:f.get('password')});
-  if (res.ok) {
-    document.getElementById('loginView').classList.add('hidden');
-    document.getElementById('mainView').classList.remove('hidden');
-    loadAll();
-  } else {
-    document.getElementById('loginMsg').innerText = res.msg || 'Login gagal';
+  const msgEl = document.getElementById('loginMsg');
+  msgEl.innerText = 'Memproses...';
+  msgEl.style.color = 'var(--muted)';
+  try {
+    const res = await api('login',{username:f.get('username'),password:f.get('password')});
+    if (res.ok) {
+      document.getElementById('loginView').classList.add('hidden');
+      document.getElementById('mainView').classList.remove('hidden');
+      loadAll();
+    } else {
+      msgEl.style.color = 'red';
+      msgEl.innerText = res.msg || 'Login gagal';
+    }
+  } catch (err) {
+    msgEl.style.color = 'red';
+    if (err.message && err.message.includes('InfinityFree')) {
+      msgEl.innerText = 'Mengatasi pemblokiran hosting... Halaman akan dimuat ulang.';
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(registrations => {
+          for (let registration of registrations) {
+            registration.unregister();
+          }
+          setTimeout(() => { window.location.reload(true); }, 800);
+        });
+      } else {
+        setTimeout(() => { window.location.reload(true); }, 800);
+      }
+    } else {
+      msgEl.innerText = err.message || 'Koneksi error. Silakan coba beberapa saat lagi atau refresh halaman.';
+    }
   }
 });
 
@@ -233,7 +357,7 @@ document.getElementById('btnLogout').addEventListener('click', async ()=>{
 });
 
 // delegated nav handler: single listener, robust for dynamically added buttons
-document.querySelector('nav').addEventListener('click', e => {
+document.querySelector('nav').addEventListener('click', async e => {
   const btn = e.target.closest('button');
   if (!btn || !btn.dataset.tab) return;
   
@@ -258,6 +382,7 @@ document.querySelector('nav').addEventListener('click', e => {
   if (tab === 'sales') { loadSales().catch(()=>{}); loadProductSelects().catch(()=>{}); }
   if (tab === 'criteria') loadCriteria().catch(()=>{});
   if (tab === 'values') { loadValues().catch(()=>{}); loadProductSelects().catch(()=>{}); loadCriteriaSelect().catch(()=>{}); }
+  if (tab === 'report') await refreshReportFiles().catch(()=>{});
   // analysis/report no auto-load (analysis uses Run button)
 });
 
@@ -708,24 +833,45 @@ document.getElementById('showLogin').addEventListener('click', e => {
 document.getElementById('registerForm').addEventListener('submit', async e => {
   e.preventDefault();
   const f = new FormData(e.target);
-  const res = await api('register', {
-    username: f.get('username'),
-    password: f.get('password'),
-    confirm_password: f.get('confirm_password')
-  });
   const msgEl = document.getElementById('registerMsg');
-  if (res.ok) {
-    msgEl.style.color = 'green';
-    msgEl.innerText = res.msg || 'Registrasi berhasil';
-    e.target.reset();
-    // auto switch to login after 1.5s
-    setTimeout(() => {
-      document.getElementById('showLogin').click();
-      msgEl.innerText = '';
-    }, 1500);
-  } else {
+  msgEl.innerText = 'Memproses...';
+  msgEl.style.color = 'var(--muted)';
+  try {
+    const res = await api('register', {
+      username: f.get('username'),
+      password: f.get('password'),
+      confirm_password: f.get('confirm_password')
+    });
+    if (res.ok) {
+      msgEl.style.color = 'green';
+      msgEl.innerText = res.msg || 'Registrasi berhasil';
+      e.target.reset();
+      // auto switch to login after 1.5s
+      setTimeout(() => {
+        document.getElementById('showLogin').click();
+        msgEl.innerText = '';
+      }, 1500);
+    } else {
+      msgEl.style.color = 'red';
+      msgEl.innerText = res.msg || 'Registrasi gagal';
+    }
+  } catch (err) {
     msgEl.style.color = 'red';
-    msgEl.innerText = res.msg || 'Registrasi gagal';
+    if (err.message && err.message.includes('InfinityFree')) {
+      msgEl.innerText = 'Mengatasi pemblokiran hosting... Halaman akan dimuat ulang.';
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(registrations => {
+          for (let registration of registrations) {
+            registration.unregister();
+          }
+          setTimeout(() => { window.location.reload(true); }, 800);
+        });
+      } else {
+        setTimeout(() => { window.location.reload(true); }, 800);
+      }
+    } else {
+      msgEl.innerText = err.message || 'Koneksi error. Gagal melakukan registrasi.';
+    }
   }
 });
 
@@ -738,6 +884,7 @@ async function loadAll(){
   await loadCriteria();
   await loadCriteriaSelect();
   await loadValues();
+  await refreshReportFiles();
 }
 
 // initial: try to check session by fetching list_products (will return auth error if not logged)
@@ -753,10 +900,22 @@ async function loadAll(){
   } catch(e){}
 })();
 
-// register service worker
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').catch(()=>{});
+// register service worker (skip on InfinityFree free hosting to avoid security cookie issues and MIME type console errors)
+const isInfinityFree = /rf\.gd|epizy\.com|infinityfree|byethost/i.test(window.location.hostname);
+if ('serviceWorker' in navigator && !isInfinityFree) {
+  navigator.serviceWorker.register('sw.js')
+    .then(reg => console.log('SW registered, scope:', reg.scope))
+    .catch(err => console.error('SW registration failed:', err));
+} else if (isInfinityFree && 'serviceWorker' in navigator) {
+  // Ensure any previously registered service workers are cleaned up on InfinityFree
+  navigator.serviceWorker.getRegistrations().then(registrations => {
+    for (let registration of registrations) {
+      registration.unregister();
+    }
+  });
 }
+
+
 </script>
 </body>
 </html>
