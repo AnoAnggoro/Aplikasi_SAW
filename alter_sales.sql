@@ -1,7 +1,0 @@
-USE ta;
-ALTER TABLE sales 
-  ADD COLUMN id_penjualan VARCHAR(50) DEFAULT '',
-  ADD COLUMN kode_produk VARCHAR(50) DEFAULT '',
-  ADD COLUMN nama_produk VARCHAR(255) DEFAULT '',
-  ADD COLUMN harga DECIMAL(15,2) DEFAULT 0,
-  ADD COLUMN return_qty INT DEFAULT 0;
