@@ -1,0 +1,3 @@
+# Explicitly set the MIME types for JavaScript and Web App Manifest files
+AddType application/javascript .js
+AddType application/manifest+json .json

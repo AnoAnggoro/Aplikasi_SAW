@@ -1,0 +1,3 @@
+USE ta;
+ALTER TABLE sales 
+  ADD COLUMN IF NOT EXISTS total_harga DECIMAL(15,2) DEFAULT 0;
