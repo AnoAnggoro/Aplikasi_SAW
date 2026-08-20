@@ -7,6 +7,7 @@ if (empty($_SESSION['user'])) {
 
 require_once __DIR__.'/db.php';
 $type = $_GET['type'] ?? 'products';
+$ownerName = $_SESSION['owner_name'] ?? 'Linda Indriana';
 ?>
 <!doctype html>
 <html>
@@ -33,6 +34,28 @@ table.data th { background: #2d89ef; color: white; font-weight: 600; }
 table.data tr:nth-child(even) { background: #f9f9f9; }
 h3 { color: #2d89ef; margin-top: 20px; }
 .footer { margin-top: 30px; text-align: right; font-size: 12px; }
+.footer .signature-block {
+  display: inline-block;
+  text-align: center;
+  margin-top: 28px;
+}
+.footer .owner-name {
+  margin: 0;
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 1.1;
+  display: inline-block;
+  padding-bottom: 2px;
+  border-bottom: 2px solid #000;
+}
+.footer .owner-title {
+  margin: 5px 0 0 0;
+  font-size: 13px;
+  color: #000;
+}
+.footer .signature-line {
+  display: none;
+}
 .no-print { margin: 20px 0; }
 </style>
 </head>
@@ -40,9 +63,8 @@ h3 { color: #2d89ef; margin-top: 20px; }
 
 <div class="kop-surat">
   <img src="img/logo.png" alt="Logo">
-  <h2>SISTEM ANALISIS PRODUK FAST/SLOW MOVING</h2>
-  <p>Metode Simple Additive Weighting (SAW)</p>
-  <p>Alamat: Jl. Contoh No. 123, Kota | Telp: (021) 12345678 | Email: info@saw.com</p>
+  <h2>HIJABEYLI FASHION</h2>
+  <p>Kp. Parung Belimbing RT04/ RW04, Pancoran Mas, Depok, Kota Depok, 16431.  | Telp: 081319983240 | Email: hijabeylifashion@gmail.com</p>
 </div>
 
 <div class="info-laporan">
@@ -117,6 +139,79 @@ h3 { color: #2d89ef; margin-top: 20px; }
     </tbody>
   </table>
 
+<?php elseif ($type === 'profit'): ?>
+  <h3>LAPORAN LABA / KEUNTUNGAN PENJUALAN</h3>
+  <table class="data">
+    <thead>
+      <tr>
+        <th>No</th>
+        <th>ID Penjualan</th>
+        <th>Tanggal</th>
+        <th>Kode</th>
+        <th>Nama Produk</th>
+        <th>Qty Jual</th>
+        <th>Return</th>
+        <th>Net Qty</th>
+        <th>Harga Jual (Rp)</th>
+        <th>Modal (Rp)</th>
+        <th>Total Pendapatan (Rp)</th>
+        <th>Total Modal (Rp)</th>
+        <th>Keuntungan (Rp)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <?php
+      $stmt = $pdo->query("SELECT s.*, p.biaya FROM sales s LEFT JOIN products p ON s.product_id = p.id ORDER BY s.sales_date DESC, s.id DESC");
+      $no = 1;
+      $total_net_qty = 0;
+      $total_revenue = 0;
+      $total_cost = 0;
+      $total_profit = 0;
+      
+      foreach ($stmt->fetchAll() as $s):
+        $biaya = floatval($s['biaya'] ?? 0);
+        $qty = intval($s['qty']);
+        $return_qty = intval($s['return_qty'] ?? 0);
+        $net_qty = $qty - $return_qty;
+        $harga = floatval($s['harga']);
+        
+        $revenue = $net_qty * $harga;
+        $cost = $net_qty * $biaya;
+        $profit = $revenue - $cost;
+        
+        $total_net_qty += $net_qty;
+        $total_revenue += $revenue;
+        $total_cost += $cost;
+        $total_profit += $profit;
+      ?>
+      <tr>
+        <td><?= $no++ ?></td>
+        <td><?= htmlspecialchars($s['id_penjualan'] ?: '-') ?></td>
+        <td><?= htmlspecialchars($s['sales_date']) ?></td>
+        <td><?= htmlspecialchars($s['kode_produk'] ?: '-') ?></td>
+        <td><?= htmlspecialchars($s['nama_produk'] ?: '-') ?></td>
+        <td><?= $qty ?></td>
+        <td><?= $return_qty ?></td>
+        <td><?= $net_qty ?></td>
+        <td><?= number_format($harga, 0, ',', '.') ?></td>
+        <td><?= number_format($biaya, 0, ',', '.') ?></td>
+        <td><?= number_format($revenue, 0, ',', '.') ?></td>
+        <td><?= number_format($cost, 0, ',', '.') ?></td>
+        <td style="font-weight:600;color:<?= $profit >= 0 ? '#2e7d32' : '#c62828' ?>"><?= number_format($profit, 0, ',', '.') ?></td>
+      </tr>
+      <?php endforeach; ?>
+      <tr style="font-weight:bold;background:#e3f2fd">
+        <td colspan="5" style="text-align:right">TOTAL</td>
+        <td colspan="2"></td>
+        <td><?= $total_net_qty ?></td>
+        <td colspan="2"></td>
+        <td><?= number_format($total_revenue, 0, ',', '.') ?></td>
+        <td><?= number_format($total_cost, 0, ',', '.') ?></td>
+        <td style="color:<?= $total_profit >= 0 ? '#2e7d32' : '#c62828' ?>"><?= number_format($total_profit, 0, ',', '.') ?></td>
+      </tr>
+    </tbody>
+  </table>
+
 <?php elseif ($type === 'analysis'): ?>
   <h3>LAPORAN ANALISIS SAW</h3>
   
@@ -157,11 +252,7 @@ h3 { color: #2d89ef; margin-top: 20px; }
       foreach ($criteria as $c) {
         $j = $c['id'];
         $x = $vals[$pid][$j];
-        if ($c['atribut'] === 'benefit') {
-          $rij = ($max[$j] > 0) ? ($x / $max[$j]) : 0;
-        } else {
-          $rij = ($x > 0) ? ($min[$j] / $x) : 0;
-        }
+        $rij = saw_rij($x, $min[$j], $max[$j], $c['atribut']);
         $normalized[$pid][$j] = $rij;
         $scores[$pid] += $rij * floatval($c['bobot']);
       }
@@ -210,15 +301,104 @@ h3 { color: #2d89ef; margin-top: 20px; }
 <?php endif; ?>
 
 <div class="footer">
-  <p>Dicetak pada: <?= date('d/m/Y H:i:s') ?></p>
-  <p style="margin-top:40px">_________________________</p>
-  <p>( <?= htmlspecialchars($_SESSION['user']) ?> )</p>
+  <?php
+  date_default_timezone_set('Asia/Jakarta');
+  $days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+  $months = [
+      1 => 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+  ];
+  $dayName = $days[date('w')];
+  $monthName = $months[(int)date('m')];
+  ?>
+  <p>Depok, <?= $dayName ?> <?= date('j') ?> <?= $monthName ?> <?= date('Y') ?></p>
+  <div class="signature-block">
+    <p class="owner-name"><?= htmlspecialchars($ownerName) ?></p>
+    <p class="owner-title">Owner</p>
+  </div>
+
 </div>
 
 <div class="no-print" style="text-align:center">
-  <button onclick="window.print()" style="padding:10px 20px;background:#2d89ef;color:white;border:none;border-radius:8px;cursor:pointer;font-weight:600">🖨️ Cetak Laporan</button>
+  <button onclick="handleCetak()" style="padding:10px 20px;background:#2d89ef;color:white;border:none;border-radius:8px;cursor:pointer;font-weight:600">🖨️ Cetak Laporan</button>
   <button onclick="window.close()" style="padding:10px 20px;background:#666;color:white;border:none;border-radius:8px;cursor:pointer;margin-left:8px">❌ Tutup</button>
 </div>
 
+<!-- JS PDF and HTML2Canvas Libraries -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+<script>
+function isMobileOrWebView() {
+  const ua = navigator.userAgent || navigator.vendor || window.opera;
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+  const isWebView = (ua.includes('wv') || ua.includes('WebView') || ua.includes('Median') || !window.chrome) && isMobile;
+  return isMobile || isWebView;
+}
+
+function handleCetak() {
+  if (isMobileOrWebView()) {
+    exportPDF();
+  } else {
+    window.print();
+  }
+}
+
+async function exportPDF() {
+  const btnArea = document.querySelector('.no-print');
+  if (btnArea) btnArea.style.display = 'none';
+
+  // Add a simple loading overlay
+  const loading = document.createElement('div');
+  loading.setAttribute('id', 'pdf-loading');
+  loading.setAttribute('data-html2canvas-ignore', 'true');
+  loading.innerHTML = '<div style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(255,255,255,0.85);display:flex;flex-direction:column;justify-content:center;align-items:center;z-index:9999;font-weight:bold;font-family:Arial,sans-serif;color:#2d89ef;font-size:16px;"><span>⏳ Sedang memproses PDF...</span><span style="font-size:12px;color:#666;margin-top:8px;">Laporan Anda sedang disimpan ke galeri/unduhan</span></div>';
+  document.body.appendChild(loading);
+
+  try {
+    const { jsPDF } = window.jspdf;
+    
+    // capture body using html2canvas
+    const canvas = await html2canvas(document.body, {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      scrollY: -window.scrollY
+    });
+
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    
+    const imgWidth = 210; // A4 size width in mm
+    const pageHeight = 297; // A4 size height in mm
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    
+    let heightLeft = imgHeight;
+    let position = 0;
+
+    pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+    heightLeft -= pageHeight;
+
+    while (heightLeft > 0) {
+      position = heightLeft - imgHeight;
+      pdf.addPage();
+      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+    }
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const type = urlParams.get('type') || 'laporan';
+    pdf.save(`laporan_${type}_${new Date().toISOString().slice(0,10)}.pdf`);
+    
+  } catch (err) {
+    console.error('PDF Error:', err);
+    alert('Gagal mencetak laporan ke PDF: ' + err.message);
+  } finally {
+    const loadEl = document.getElementById('pdf-loading');
+    if (loadEl) loadEl.remove();
+    if (btnArea) btnArea.style.display = 'block';
+  }
+}
+</script>
 </body>
 </html>
