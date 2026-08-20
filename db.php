@@ -17,3 +17,10 @@ try {
     echo json_encode(['error' => 'DB connection failed: '.$e->getMessage()]);
     exit;
 }
+
+// Normalisasi SAW. benefit: x/max ; cost: min/x, tapi x=0 pada cost = kondisi
+// terbaik (mis. tanpa retur) sehingga rij = 1, bukan 0.
+function saw_rij($x, $min, $max, $atribut) {
+    if ($atribut === 'benefit') return ($max > 0) ? ($x / $max) : 0.0;
+    return ($x == 0) ? 1.0 : ($min / $x);
+}
